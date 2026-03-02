@@ -122,7 +122,7 @@ export function BlocklyEditor({
       save(workspace);
       
      
-      pythonGenerator.definitions_ = {};
+      (pythonGenerator as any).definitions_ = {};
       
       const code = pythonGenerator.workspaceToCode(workspace);
       onCodeChange(code);
@@ -144,7 +144,6 @@ export function BlocklyEditor({
       Object.assign(pythonGenerator.forBlock, merged);
 
       // Override the finish method to properly handle function definitions
-      const originalFinish = pythonGenerator.finish.bind(pythonGenerator);
       pythonGenerator.finish = function(code: string) {
         // Get all definitions (functions)
         const definitions = Object.values(this.definitions_ || {}).join('\n');
@@ -227,7 +226,7 @@ export function BlocklyEditor({
             
             // Initialize generator before generating code
             pythonGenerator.init(workspace);
-            pythonGenerator.definitions_ = {};
+            (pythonGenerator as any).definitions_ = {};
             
             const code = pythonGenerator.workspaceToCode(workspace);
             onCodeChange(code);
