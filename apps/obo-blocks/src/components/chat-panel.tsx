@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import type { ConversationMessage } from "@/agent/types";
 
 interface ChatMessage {
   id: number;
@@ -27,9 +29,14 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
     },
   ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: -1, y: -1 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [size, setSize] = useState({ width: 350, height: 460 });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   const chatRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -84,6 +91,47 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging, dragOffset]);
+
+  // ── Resize handlers ────────────────────────────────────────────────────────
+  const MIN_W = 280;
+  const MIN_H = 300;
+  const MAX_W = 700;
+  const MAX_H = 800;
+
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsResizing(true);
+      resizeStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        width: size.width,
+        height: size.height,
+      };
+    },
+    [size]
+  );
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const { x, y, width, height } = resizeStartRef.current;
+      const newW = Math.max(MIN_W, Math.min(MAX_W, width + (e.clientX - x)));
+      const newH = Math.max(MIN_H, Math.min(MAX_H, height + (e.clientY - y)));
+      setSize({ width: newW, height: newH });
+    };
+
+    const handleMouseUp = () => setIsResizing(false);
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
 
   // Touch drag handlers
   const handleTouchStart = useCallback(
@@ -178,18 +226,11 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
                 id: Date.now() + 3,
                 text: success
                   ? "Python code converted and imported as blocks!"
-                  : "Conversion succeeded but import failed. Here is the JSON:",
+                  : "Conversion succeeded but the workspace could not be updated. Please try again.",
                 sender: "bot",
                 timestamp: new Date(),
-                isJson: !success,
               },
             ]);
-            if (!success) {
-              setMessages((prev) => [
-                ...prev,
-                { id: Date.now() + 4, text: jsonResult, sender: "bot", timestamp: new Date(), isJson: true },
-              ]);
-            }
           }
         } else {
           setMessages((prev) => [
@@ -215,7 +256,7 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
     }
   }, [input, onConvertPython, onImportJson]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
 
@@ -247,17 +288,153 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
       return;
     }
 
-    // Simulated bot reply for non-JSON messages
-    setTimeout(() => {
-      const botMessage: ChatMessage = {
-        id: Date.now() + 1,
-        text: "Thanks for your message! This is a placeholder response.",
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botMessage]);
-    }, 600);
-  }, [input]);
+    // ── Send through the agent graph ─────────────────────────────────────────
+    setIsLoading(true);
+    const thinkingId = Date.now() + 1;
+    setMessages((prev) => [
+      ...prev,
+      { id: thinkingId, text: "Thinking...", sender: "bot", timestamp: new Date() },
+    ]);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed, history: conversationHistory }),
+      });
+      const data = await res.json();
+
+      // Remove thinking bubble
+      setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
+
+      if (data.error && !data.reply) {
+        setMessages((prev) => [
+          ...prev,
+          { id: Date.now() + 2, text: `Error: ${data.error}`, sender: "bot", timestamp: new Date() },
+        ]);
+        return;
+      }
+
+      const reply: string = data.reply || "No response generated.";
+      const agentKind: string | undefined = data.agent; // "question" | "code_generation"
+
+      // Show the text reply with a subtle agent label
+      const agentLabel =
+        agentKind === "code_generation"
+          ? "🛠️ Code Generation Agent"
+          : agentKind === "question"
+          ? "💡 Question Agent"
+          : undefined;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          text: agentLabel ? `[${agentLabel}]\n\n${reply}` : reply,
+          sender: "bot",
+          timestamp: new Date(),
+        },
+      ]);
+
+      // Update multi-turn conversation history
+      setConversationHistory((prev) => [
+        ...prev,
+        { role: "user", parts: [{ text: trimmed }] },
+        { role: "model", parts: [{ text: reply }] },
+      ]);
+
+      // ── Code generation: auto-convert Python → blocks ────────────────────
+      if (agentKind === "code_generation" && data.pythonCode && onConvertPython) {
+        const convertingId = Date.now() + 3;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: convertingId,
+            text: "Converting generated code to blocks...",
+            sender: "bot",
+            timestamp: new Date(),
+          },
+        ]);
+        setIsConverting(true);
+
+        try {
+          const jsonResult = await onConvertPython(data.pythonCode);
+
+          setMessages((prev) => prev.filter((m) => m.id !== convertingId));
+
+          if (jsonResult) {
+            // Check for converter-level error
+            try {
+              const parsed = JSON.parse(jsonResult);
+              if (parsed.error) {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: Date.now() + 4,
+                    text: `Block conversion error: ${parsed.error}`,
+                    sender: "bot",
+                    timestamp: new Date(),
+                  },
+                ]);
+                return;
+              }
+            } catch { /* not an error object */ }
+
+            if (onImportJson) {
+              const success = onImportJson(jsonResult);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: Date.now() + 4,
+                  text: success
+                    ? "✅ Code imported as blocks in your workspace!"
+                    : "Code was generated but the workspace could not be updated. Please try again.",
+                  sender: "bot",
+                  timestamp: new Date(),
+                },
+              ]);
+            }
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now() + 4,
+                text: "Code was generated but block conversion returned no result.",
+                sender: "bot",
+                timestamp: new Date(),
+              },
+            ]);
+          }
+        } catch (convErr) {
+          setMessages((prev) => prev.filter((m) => m.id !== convertingId));
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now() + 4,
+              text: `Block conversion failed: ${convErr instanceof Error ? convErr.message : String(convErr)}`,
+              sender: "bot",
+              timestamp: new Date(),
+            },
+          ]);
+        } finally {
+          setIsConverting(false);
+        }
+      }
+    } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          text: `Failed to reach assistant: ${err instanceof Error ? err.message : String(err)}`,
+          sender: "bot",
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [input, conversationHistory, onConvertPython, onImportJson]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -294,6 +471,8 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
         cursor: isDragging ? "grabbing" : "default",
       }}
     >
@@ -326,7 +505,13 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
             className={`chat-message ${msg.sender === "user" ? "chat-message-user" : "chat-message-bot"}`}
           >
             <div className="chat-bubble">
-              <p>{msg.text}</p>
+              {msg.sender === "bot" ? (
+                <div className="chat-markdown">
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <p style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
+              )}
               <span className="chat-time">
                 {msg.timestamp.toLocaleTimeString([], {
                   hour: "2-digit",
@@ -415,12 +600,22 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
         <button
           className="chat-send-btn"
           onClick={handleSend}
-          disabled={!input.trim()}
+          disabled={!input.trim() || isLoading}
           title="Send"
         >
-          <i className="fa fa-paper-plane" />
+          {isLoading ? (
+            <i className="fa fa-spinner fa-spin" />
+          ) : (
+            <i className="fa fa-paper-plane" />
+          )}
         </button>
       </div>
+
+      {/* Resize handle (bottom-right corner) */}
+      <div
+        className="chat-resize-handle"
+        onMouseDown={handleResizeMouseDown}
+      />
     </div>
   );
 }
