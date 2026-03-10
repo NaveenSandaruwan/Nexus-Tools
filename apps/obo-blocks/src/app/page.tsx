@@ -105,7 +105,7 @@ export default function Home() {
   return (
     <div className="app-container">
       <Notification message={notification} />
-      <ChatPanel onImportJson={handleChatImportJson} onConvertPython={handleConvertPython} />
+      <ChatPanel onImportJson={handleChatImportJson} onConvertPython={handleConvertPython} currentCode={code} />
       <Navbar />
 
       {isClient && (

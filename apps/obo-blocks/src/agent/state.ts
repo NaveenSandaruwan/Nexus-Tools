@@ -9,11 +9,11 @@ import type { ConversationMessage } from "./types";
 
 // ─── Node identifiers ─────────────────────────────────────────────────────────
 
-export type NodeId = "router" | "question_agent" | "code_gen_agent" | "end";
+export type NodeId = "router" | "question_agent" | "code_gen_agent" | "code_completion_agent" | "end";
 
 // ─── Agent that was selected by the router ────────────────────────────────────
 
-export type RoutedAgent = "question" | "code_generation";
+export type RoutedAgent = "question" | "code_generation" | "code_completion";
 
 // ─── Per-node execution status ────────────────────────────────────────────────
 
@@ -27,6 +27,9 @@ export interface GraphState {
 
   /** Conversation history passed in from the client */
   history: ConversationMessage[];
+
+  /** Current Python code from the editor (for code completion) */
+  currentCode?: string;
 
   /** Which node is currently executing */
   currentNode: NodeId;
@@ -55,11 +58,13 @@ export interface GraphState {
 
 export function createInitialState(
   userMessage: string,
-  history: ConversationMessage[] = []
+  history: ConversationMessage[] = [],
+  currentCode?: string
 ): GraphState {
   return {
     userMessage,
     history,
+    currentCode,
     currentNode: "router",
     nodeStatuses: { router: "pending" },
   };

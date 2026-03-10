@@ -7,8 +7,9 @@
  *   START
  *     │
  *     ▼
- *  [router]  ──► routedTo="question"        ──► [question_agent] ──► END
- *            ──► routedTo="code_generation" ──► [code_gen_agent] ──► END
+ *  [router]  ──► routedTo="question"          ──► [question_agent]        ──► END
+ *            ──► routedTo="code_generation"   ──► [code_gen_agent]        ──► END
+ *            ──► routedTo="code_completion"   ──► [code_completion_agent] ──► END
  *
  * Each node is a pure async function: (GraphState) => Promise<GraphState>.
  * Nodes mutate the state in place and set state.currentNode to the next node.
@@ -19,6 +20,7 @@ import type { ConversationMessage } from "./types";
 import { runRouterNode } from "./router";
 import { runQuestionAgentNode } from "./question-agent";
 import { runCodeGenAgentNode } from "./code-gen-agent";
+import { runCodeCompletionAgentNode } from "./code-completion-agent";
 
 // ─── Node registry ─────────────────────────────────────────────────────────────
 
@@ -28,6 +30,7 @@ const NODE_MAP: Record<string, NodeFn> = {
   router: runRouterNode,
   question_agent: runQuestionAgentNode,
   code_gen_agent: runCodeGenAgentNode,
+  code_completion_agent: runCodeCompletionAgentNode,
 };
 
 // ─── Graph runner ──────────────────────────────────────────────────────────────
@@ -43,9 +46,10 @@ const MAX_STEPS = 10; // safety circuit-breaker to prevent infinite loops
  */
 export async function runGraph(
   userMessage: string,
-  history: ConversationMessage[] = []
+  history: ConversationMessage[] = [],
+  currentCode?: string
 ): Promise<GraphState> {
-  let state = createInitialState(userMessage, history);
+  let state = createInitialState(userMessage, history, currentCode);
   let steps = 0;
 
   while (state.currentNode !== "end" && steps < MAX_STEPS) {

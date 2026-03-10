@@ -8,7 +8,6 @@
  */
 
 import { GoogleGenerativeAI, type ChatSession } from "@google/generative-ai";
-import { KNOWLEDGE_BASE } from "./knowledge";
 import type { GraphState } from "./state";
 
 const SYSTEM_INSTRUCTION = `You are OBO Blocks Code Generator — an AI embedded in a visual block-based MicroPython coding editor.
@@ -22,8 +21,6 @@ RULES:
 4. Before the code block: write a brief 1–3 sentence explanation of what the program does.
 5. After the code block: optionally add a short note about parameters the user can adjust.
 6. Keep code simple and well-commented using # comments.
-
-${KNOWLEDGE_BASE}
 
 RESPONSE FORMAT:
 <short explanation of what the program does>

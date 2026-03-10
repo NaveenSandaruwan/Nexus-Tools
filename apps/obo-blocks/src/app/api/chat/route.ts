@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Run the full agent graph: Router → QuestionAgent | CodeGenAgent
-    const finalState = await runGraph(body.message, body.history ?? []);
+    // Run the full agent graph: Router → QuestionAgent | CodeGenAgent | CodeCompletionAgent
+    const finalState = await runGraph(body.message, body.history ?? [], body.currentCode);
 
     if (finalState.error && !finalState.reply) {
       return NextResponse.json<ChatResponse>(
