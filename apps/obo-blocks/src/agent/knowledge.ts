@@ -12,9 +12,9 @@ import path from "path";
 function loadKnowledgeBase(): string {
   const candidates = [
     // When compiled: __dirname points to .next/server/...
-    path.join(process.cwd(), "src", "agent", "knowledge.md"),
+    path.join(process.cwd(), "src", "agent", "language_constraints.md"),
     // Fallback: same directory as this file (ts-node / jest)
-    path.join(__dirname, "knowledge.md"),
+    path.join(__dirname, "language_constraints.md"),
   ];
 
   for (const candidate of candidates) {
@@ -27,10 +27,10 @@ function loadKnowledgeBase(): string {
   }
 
   console.warn(
-    "[knowledge] Could not load knowledge.md — agents will run without it."
+    "[knowledge] Could not load language_constraints.md — agents will run without it."
   );
   return "";
 }
 
-/** The full contents of knowledge.md, available to all agents */
+/** The full contents of language_constraints.md, available to all agents */
 export const KNOWLEDGE_BASE: string = loadKnowledgeBase();
