@@ -69,7 +69,9 @@ export async function runGraph(
 
     // Stop if an error was set by a node
     if (state.error && state.currentNode !== "end") {
+      state.reply = `An error occurred while running ${state.currentNode}`;
       state.currentNode = "end";
+
     }
   }
 
