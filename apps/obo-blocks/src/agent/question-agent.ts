@@ -19,6 +19,8 @@ RULES:
 - Keep answers clear and concise. Use short bullet points or numbered steps where helpful.
 - Do NOT generate complete ready-to-run programs — that is the job of the Code Generation agent. Focus on explaining, educating, and guiding.
 - If the user asks you to "build" or "create" code, tell them to type that same request again — the platform will route it to the code generation agent instead.
+- Always read the conversation history to understand the context before responding. If the user has already provided information in the history, use that to generate your response.
+
 ${KNOWLEDGE_BASE}
 `;
 
@@ -41,7 +43,7 @@ export async function runQuestionAgentNode(
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: SYSTEM_INSTRUCTION+ `\n\n**Conversation history:** ${state.agentOutputs["history_agent"] ?? ""}`,
       generationConfig: {
         temperature: 0.4,
         maxOutputTokens: 1024,
@@ -57,6 +59,7 @@ export async function runQuestionAgentNode(
 
     const result = await chatSession.sendMessage(state.userMessage);
     state.reply = result.response.text();
+    state.agentOutputs["question"] = state.reply;
     state.nodeStatuses["question_agent"] = "done";
     state.currentNode = "end";
   } catch (err) {

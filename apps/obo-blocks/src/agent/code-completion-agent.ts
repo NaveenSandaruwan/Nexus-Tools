@@ -91,6 +91,7 @@ export async function runCodeCompletionAgentNode(
     const fullReply = result.response.text();
 
     state.reply = fullReply;
+    state.agentOutputs["code_completion"] = fullReply;
     state.pythonCode = extractPythonCode(fullReply) ?? undefined;
 
     state.nodeStatuses["code_completion_agent"] = "done";

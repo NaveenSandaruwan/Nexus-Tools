@@ -9,7 +9,7 @@ import type { ConversationMessage } from "./types";
 
 // ─── Node identifiers ─────────────────────────────────────────────────────────
 
-export type NodeId = "router" | "question_agent" | "code_gen_agent" | "code_completion_agent" | "end";
+export type NodeId = "router" | "question_agent" | "code_gen_agent" | "code_completion_agent" | "history_agent" | "end";
 
 // ─── Agent that was selected by the router ────────────────────────────────────
 
@@ -18,6 +18,10 @@ export type RoutedAgent = "question" | "code_generation" | "code_completion";
 // ─── Per-node execution status ────────────────────────────────────────────────
 
 export type NodeStatus = "pending" | "running" | "done" | "error";
+
+// ─── All agent names ─────────────────────────────────
+
+export type AgentName = RoutedAgent | "history_agent" ;
 
 // ─── The shared state object that flows through every node ───────────────────
 
@@ -43,6 +47,9 @@ export interface GraphState {
   /** Final text reply shown in the chat bubble */
   reply?: string;
 
+  /** Store each agents' outputs */
+  agentOutputs: Record<AgentName, string>;
+
   /**
    * Raw Python code extracted from the code-gen agent's response.
    * If present the client will call onConvertPython() → onImportJson()
@@ -65,7 +72,13 @@ export function createInitialState(
     userMessage,
     history,
     currentCode,
-    currentNode: "router",
-    nodeStatuses: { router: "pending" },
+    currentNode: "history_agent",
+    nodeStatuses: { history_agent: "pending" },
+    agentOutputs: {
+      question: "",
+      code_generation: "",
+      code_completion: "",
+      history_agent: ""
+    }
   };
 }

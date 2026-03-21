@@ -18,7 +18,7 @@ const ROUTER_PROMPT = `You are a routing assistant for OBO Blocks, a visual bloc
 Classify the user's message into EXACTLY ONE of these three categories:
 
 1. "code_generation" — The user is asking you to:
-   - Generate, write, create, or build Python/MicroPython code from scratch
+   - Generate, write, create, 'Give me the code' or build Python/MicroPython code from scratch
    - Create a new program, script, or routine
    - Show a working example (with actual code)
    - Build something with blocks (e.g. "make an LED blink", "create a loop that reads a sensor")
@@ -51,7 +51,7 @@ function getGenAI(): GoogleGenerativeAI {
  */
 export async function runRouterNode(state: GraphState): Promise<GraphState> {
   state.nodeStatuses["router"] = "running";
-
+  console.log("History Agent - system instruction:", state.history);
   try {
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({

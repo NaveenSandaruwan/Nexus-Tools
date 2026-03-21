@@ -21,12 +21,14 @@ import { runRouterNode } from "./router";
 import { runQuestionAgentNode } from "./question-agent";
 import { runCodeGenAgentNode } from "./code-gen-agent";
 import { runCodeCompletionAgentNode } from "./code-completion-agent";
+import { runHistoryNode } from "./history-assistant";
 
 // ─── Node registry ─────────────────────────────────────────────────────────────
 
 type NodeFn = (state: GraphState) => Promise<GraphState>;
 
 const NODE_MAP: Record<string, NodeFn> = {
+  history_agent: runHistoryNode,
   router: runRouterNode,
   question_agent: runQuestionAgentNode,
   code_gen_agent: runCodeGenAgentNode,

@@ -301,7 +301,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history: conversationHistory, currentCode }),
+        body: JSON.stringify({ message: trimmed, history: conversationHistory.slice(-10), currentCode }),
       });
       const data = await res.json();
 
