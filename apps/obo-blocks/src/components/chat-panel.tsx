@@ -15,9 +15,10 @@ interface ChatMessage {
 interface ChatPanelProps {
   onImportJson?: (jsonString: string) => boolean;
   onConvertPython?: (pythonCode: string) => Promise<string | null>;
+  currentCode?: string;
 }
 
-export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
+export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPanelProps) {
   const [isConverting, setIsConverting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -300,7 +301,7 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history: conversationHistory }),
+        body: JSON.stringify({ message: trimmed, history: conversationHistory.slice(-10), currentCode }),
       });
       const data = await res.json();
 
@@ -322,6 +323,8 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
       const agentLabel =
         agentKind === "code_generation"
           ? "🛠️ Code Generation Agent"
+          : agentKind === "code_completion"
+          ? "🔧 Code Completion Agent"
           : agentKind === "question"
           ? "💡 Question Agent"
           : undefined;
@@ -343,8 +346,8 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
         { role: "model", parts: [{ text: reply }] },
       ]);
 
-      // ── Code generation: auto-convert Python → blocks ────────────────────
-      if (agentKind === "code_generation" && data.pythonCode && onConvertPython) {
+      // ── Code generation / completion: auto-convert Python → blocks ──────
+      if ((agentKind === "code_generation" || agentKind === "code_completion") && data.pythonCode && onConvertPython) {
         const convertingId = Date.now() + 3;
         setMessages((prev) => [
           ...prev,
@@ -434,7 +437,7 @@ export function ChatPanel({ onImportJson, onConvertPython }: ChatPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [input, conversationHistory, onConvertPython, onImportJson]);
+  }, [input, conversationHistory, currentCode, onConvertPython, onImportJson]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

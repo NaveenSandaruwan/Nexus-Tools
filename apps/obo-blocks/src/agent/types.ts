@@ -11,14 +11,17 @@ export interface ConversationMessage {
 export interface ChatRequest {
   message: string;
   history?: ConversationMessage[];
+  /** Current Python code in the editor (for code completion agent) */
+  currentCode?: string;
 }
 
 /**
  * Which agent handled the response.
  *  - "question"        → explanatory/informational answer
  *  - "code_generation" → Python code was generated; pythonCode may be present
+ *  - "code_completion" → existing code was extended/completed; pythonCode present
  */
-export type AgentKind = "question" | "code_generation";
+export type AgentKind = "question" | "code_generation" | "code_completion";
 
 /** Response body returned from the /api/chat endpoint */
 export interface ChatResponse {
@@ -27,7 +30,7 @@ export interface ChatResponse {
   /** Which agent produced this response */
   agent?: AgentKind;
   /**
-   * Extracted Python code snippet (only present when agent === "code_generation").
+   * Extracted Python code snippet (only present when agent === "code_generation" or "code_completion").
    * The client should pass this to onConvertPython() → onImportJson() to
    * draw the blocks automatically in the workspace.
    */

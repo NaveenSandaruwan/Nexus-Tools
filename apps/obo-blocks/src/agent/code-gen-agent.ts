@@ -8,7 +8,6 @@
  */
 
 import { GoogleGenerativeAI, type ChatSession } from "@google/generative-ai";
-import { KNOWLEDGE_BASE } from "./knowledge";
 import type { GraphState } from "./state";
 
 const SYSTEM_INSTRUCTION = `You are OBO Blocks Code Generator — an AI embedded in a visual block-based MicroPython coding editor.
@@ -22,8 +21,7 @@ RULES:
 4. Before the code block: write a brief 1–3 sentence explanation of what the program does.
 5. After the code block: optionally add a short note about parameters the user can adjust.
 6. Keep code simple and well-commented using # comments.
-
-${KNOWLEDGE_BASE}
+7. Read the conversation history to understand the context before generating code. If the user has already provided information in the history, use that to generate your response.
 
 RESPONSE FORMAT:
 <short explanation of what the program does>
@@ -66,7 +64,7 @@ export async function runCodeGenAgentNode(
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: SYSTEM_INSTRUCTION + `\n\n**Conversation history:** ${state.agentOutputs["history_agent"] ?? ""}`,
       generationConfig: {
         temperature: 0.2,   // low temp = consistent, predictable code
         maxOutputTokens: 2048,
@@ -84,6 +82,7 @@ export async function runCodeGenAgentNode(
     const fullReply = result.response.text();
 
     state.reply = fullReply;
+    state.agentOutputs["code_generation"] = fullReply;
     state.pythonCode = extractPythonCode(fullReply) ?? undefined;
 
     state.nodeStatuses["code_gen_agent"] = "done";

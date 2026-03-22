@@ -59,34 +59,6 @@ export default function Home() {
     async (pythonCode: string): Promise<string | null> => {
       try {
         const json = await convertPythonToBlocks(pythonCode);
-
-        // Debug: download the converted JSON as a file
-        if (json) {
-          try {
-            const pretty = JSON.stringify(JSON.parse(json), null, 2);
-            const blob = new Blob([pretty], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `converted-blocks-${Date.now()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          } catch {
-            // If JSON parsing fails, save raw string
-            const blob = new Blob([json], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `converted-blocks-${Date.now()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          }
-        }
-
         return json;
       } catch (err) {
         console.error("Python-to-blocks conversion error:", err);
@@ -133,7 +105,7 @@ export default function Home() {
   return (
     <div className="app-container">
       <Notification message={notification} />
-      <ChatPanel onImportJson={handleChatImportJson} onConvertPython={handleConvertPython} />
+      <ChatPanel onImportJson={handleChatImportJson} onConvertPython={handleConvertPython} currentCode={code} />
       <Navbar />
 
       {isClient && (
