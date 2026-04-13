@@ -13,8 +13,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Run the full agent graph: Router → QuestionAgent | CodeGenAgent | CodeCompletionAgent
-    const finalState = await runGraph(body.message, body.history ?? [], body.currentCode);
+    // Run the full agent graph: Router → QuestionAgent | CodeGenAgent
+    // Pass preferredMode to override automatic routing if user selected a mode
+    const finalState = await runGraph(
+      body.message,
+      body.history ?? [],
+      body.currentCode,
+      body.mode
+    );
 
     if (finalState.error && !finalState.reply) {
       return NextResponse.json<ChatResponse>(
