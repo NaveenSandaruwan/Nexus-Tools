@@ -7,9 +7,8 @@
  *   START
  *     │
  *     ▼
- *  [router]  ──► routedTo="question"          ──► [question_agent]        ──► END
- *            ──► routedTo="code_generation"   ──► [code_gen_agent]        ──► END
- *            ──► routedTo="code_completion"   ──► [code_completion_agent] ──► END
+ *  [router]  ──► routedTo="question"          ──► [question_agent]  ──► END
+ *            ──► routedTo="code_generation"   ──► [code_gen_agent]  ──► END
  *
  * Each node is a pure async function: (GraphState) => Promise<GraphState>.
  * Nodes mutate the state in place and set state.currentNode to the next node.
@@ -20,7 +19,6 @@ import type { ConversationMessage } from "./types";
 import { runRouterNode } from "./router";
 import { runQuestionAgentNode } from "./question-agent";
 import { runCodeGenAgentNode } from "./code-gen-agent";
-import { runCodeCompletionAgentNode } from "./code-completion-agent";
 import { runHistoryNode } from "./history-assistant";
 
 // ─── Node registry ─────────────────────────────────────────────────────────────
@@ -32,7 +30,6 @@ const NODE_MAP: Record<string, NodeFn> = {
   router: runRouterNode,
   question_agent: runQuestionAgentNode,
   code_gen_agent: runCodeGenAgentNode,
-  code_completion_agent: runCodeCompletionAgentNode,
 };
 
 // ─── Graph runner ──────────────────────────────────────────────────────────────
@@ -44,14 +41,17 @@ const MAX_STEPS = 10; // safety circuit-breaker to prevent infinite loops
  *
  * @param userMessage  The raw message from the chat input.
  * @param history      Prior conversation turns (for multi-turn context).
+ * @param currentCode  Current Python code in the editor.
+ * @param preferredMode User's selected mode ("agent" or "ask") to override automatic routing.
  * @returns            The final graph state with .reply, .pythonCode, etc.
  */
 export async function runGraph(
   userMessage: string,
   history: ConversationMessage[] = [],
-  currentCode?: string
+  currentCode?: string,
+  preferredMode?: "agent" | "ask"
 ): Promise<GraphState> {
-  let state = createInitialState(userMessage, history, currentCode);
+  let state = createInitialState(userMessage, history, currentCode, preferredMode);
   let steps = 0;
 
   while (state.currentNode !== "end" && steps < MAX_STEPS) {

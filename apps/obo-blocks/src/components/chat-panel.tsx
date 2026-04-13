@@ -19,7 +19,6 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPanelProps) {
-  const [isConverting, setIsConverting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -37,6 +36,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [size, setSize] = useState({ width: 350, height: 460 });
   const [isResizing, setIsResizing] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<"agent" | "ask">("agent");
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   const chatRef = useRef<HTMLDivElement>(null);
@@ -170,93 +170,6 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
     };
   }, [isDragging, dragOffset]);
 
-  const handleConvertPython = useCallback(async () => {
-    const trimmed = input.trim();
-    if (!trimmed) {
-      const botMsg: ChatMessage = {
-        id: Date.now(),
-        text: "Paste Python code into the input box first, then click Convert.",
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botMsg]);
-      return;
-    }
-
-    const userMsg: ChatMessage = {
-      id: Date.now(),
-      text: trimmed,
-      sender: "user",
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-
-    const loadingMsg: ChatMessage = {
-      id: Date.now() + 1,
-      text: "Converting Python to blocks... (loading Pyodide)",
-      sender: "bot",
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, loadingMsg]);
-    setIsConverting(true);
-
-    try {
-      if (onConvertPython) {
-        const jsonResult = await onConvertPython(trimmed);
-        // Remove load message
-        setMessages((prev) => prev.filter((m) => m.id !== loadingMsg.id));
-        if (jsonResult) {
-          // Check for parse error
-          try {
-            const parsed = JSON.parse(jsonResult);
-            if (parsed.error) {
-              setMessages((prev) => [
-                ...prev,
-                { id: Date.now() + 2, text: `Conversion error: ${parsed.error}`, sender: "bot", timestamp: new Date() },
-              ]);
-              return;
-            }
-          } catch { /* not an error */ }
-          // Import the resulting JSON
-          if (onImportJson) {
-            const success = onImportJson(jsonResult);
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: Date.now() + 3,
-                text: success
-                  ? "Python code converted and imported as blocks!"
-                  : "Conversion succeeded but the workspace could not be updated. Please try again.",
-                sender: "bot",
-                timestamp: new Date(),
-              },
-            ]);
-          }
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now() + 2, text: "Conversion returned no result.", sender: "bot", timestamp: new Date() },
-          ]);
-        }
-      } else {
-        setMessages((prev) => prev.filter((m) => m.id !== loadingMsg.id));
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now() + 2, text: "Python converter is not available yet.", sender: "bot", timestamp: new Date() },
-        ]);
-      }
-    } catch (err) {
-      setMessages((prev) => prev.filter((m) => m.id !== loadingMsg.id));
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now() + 2, text: `Conversion failed: ${err instanceof Error ? err.message : String(err)}`, sender: "bot", timestamp: new Date() },
-      ]);
-    } finally {
-      setIsConverting(false);
-    }
-  }, [input, onConvertPython, onImportJson]);
-
   const handleSend = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
@@ -301,7 +214,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history: conversationHistory.slice(-10), currentCode }),
+        body: JSON.stringify({ message: trimmed, history: conversationHistory.slice(-10), currentCode, mode: selectedMode }),
       });
       const data = await res.json();
 
@@ -346,7 +259,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
         { role: "model", parts: [{ text: reply }] },
       ]);
 
-      // ── Code generation / completion: auto-convert Python → blocks ──────
+      // ── Code generation: auto-convert Python → blocks ──────
       if ((agentKind === "code_generation" || agentKind === "code_completion") && data.pythonCode && onConvertPython) {
         const convertingId = Date.now() + 3;
         setMessages((prev) => [
@@ -358,7 +271,6 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
             timestamp: new Date(),
           },
         ]);
-        setIsConverting(true);
 
         try {
           const jsonResult = await onConvertPython(data.pythonCode);
@@ -379,24 +291,21 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
                     timestamp: new Date(),
                   },
                 ]);
-                return;
+              } else if (onImportJson) {
+                const success = onImportJson(jsonResult);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: Date.now() + 4,
+                    text: success
+                      ? "✅ Code imported as blocks in your workspace!"
+                      : "Code was generated but the workspace could not be updated. Please try again.",
+                    sender: "bot",
+                    timestamp: new Date(),
+                  },
+                ]);
               }
             } catch { /* not an error object */ }
-
-            if (onImportJson) {
-              const success = onImportJson(jsonResult);
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: Date.now() + 4,
-                  text: success
-                    ? "✅ Code imported as blocks in your workspace!"
-                    : "Code was generated but the workspace could not be updated. Please try again.",
-                  sender: "bot",
-                  timestamp: new Date(),
-                },
-              ]);
-            }
           } else {
             setMessages((prev) => [
               ...prev,
@@ -419,8 +328,6 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
               timestamp: new Date(),
             },
           ]);
-        } finally {
-          setIsConverting(false);
         }
       }
     } catch (err) {
@@ -437,7 +344,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
     } finally {
       setIsLoading(false);
     }
-  }, [input, conversationHistory, currentCode, onConvertPython, onImportJson]);
+  }, [input, conversationHistory, currentCode, onImportJson, onConvertPython]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -529,72 +436,18 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
 
       {/* Input area */}
       <div className="chat-input-area">
-        <button
-          className="chat-import-btn"
-          onClick={() => {
-            const trimmed = input.trim();
-            if (!trimmed) {
-              const botMsg: ChatMessage = {
-                id: Date.now(),
-                text: "Paste a JSON string into the input box first, then click Import.",
-                sender: "bot",
-                timestamp: new Date(),
-              };
-              setMessages((prev) => [...prev, botMsg]);
-              return;
-            }
-            const userMsg: ChatMessage = {
-              id: Date.now(),
-              text: trimmed,
-              sender: "user",
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, userMsg]);
-            setInput("");
-            if (onImportJson) {
-              const success = onImportJson(trimmed);
-              setTimeout(() => {
-                const botMsg: ChatMessage = {
-                  id: Date.now() + 1,
-                  text: success
-                    ? "JSON imported to workspace successfully!"
-                    : "Invalid workspace JSON. Please check the format.",
-                  sender: "bot",
-                  timestamp: new Date(),
-                };
-                setMessages((prev) => [...prev, botMsg]);
-              }, 400);
-            } else {
-              setTimeout(() => {
-                const botMsg: ChatMessage = {
-                  id: Date.now() + 1,
-                  text: "Import is not available yet. Workspace is still loading.",
-                  sender: "bot",
-                  timestamp: new Date(),
-                };
-                setMessages((prev) => [...prev, botMsg]);
-              }, 400);
-            }
-          }}
-          title="Import JSON to workspace"
+        <select
+          className="chat-mode-dropdown"
+          value={selectedMode}
+          onChange={(e) => setSelectedMode(e.target.value as "agent" | "ask")}
+          title="Select mode"
         >
-          <i className="fa fa-file-import" />
-        </button>
-        <button
-          className="chat-convert-btn"
-          onClick={handleConvertPython}
-          disabled={isConverting}
-          title="Convert Python code to blocks"
-        >
-          {isConverting ? (
-            <i className="fa fa-spinner fa-spin" />
-          ) : (
-            <i className="fa fa-code" />
-          )}
-        </button>
+          <option value="agent">🪄 Agent</option>
+          <option value="ask">❓ Ask</option>
+        </select>
         <textarea
           className="chat-input"
-          placeholder="Type a message, paste JSON, or Python code... (Shift+Enter for new line)"
+          placeholder="Type a message... (Shift+Enter for new line)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -609,7 +462,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
           {isLoading ? (
             <i className="fa fa-spinner fa-spin" />
           ) : (
-            <i className="fa fa-paper-plane" />
+            <>📤 <i className="fa fa-paper-plane" /></>
           )}
         </button>
       </div>

@@ -13,15 +13,16 @@ export interface ChatRequest {
   history?: ConversationMessage[];
   /** Current Python code in the editor (for code completion agent) */
   currentCode?: string;
+  /** User's selected mode: "agent" (code generation) or "ask" (question) */
+  mode?: "agent" | "ask";
 }
 
 /**
  * Which agent handled the response.
  *  - "question"        → explanatory/informational answer
- *  - "code_generation" → Python code was generated; pythonCode may be present
- *  - "code_completion" → existing code was extended/completed; pythonCode present
+ *  - "code_generation" → Python code was generated or modified; pythonCode may be present
  */
-export type AgentKind = "question" | "code_generation" | "code_completion";
+export type AgentKind = "question" | "code_generation";
 
 /** Response body returned from the /api/chat endpoint */
 export interface ChatResponse {

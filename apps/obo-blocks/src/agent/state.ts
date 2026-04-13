@@ -9,11 +9,11 @@ import type { ConversationMessage } from "./types";
 
 // ─── Node identifiers ─────────────────────────────────────────────────────────
 
-export type NodeId = "router" | "question_agent" | "code_gen_agent" | "code_completion_agent" | "history_agent" | "end";
+export type NodeId = "router" | "question_agent" | "code_gen_agent" | "history_agent" | "end";
 
 // ─── Agent that was selected by the router ────────────────────────────────────
 
-export type RoutedAgent = "question" | "code_generation" | "code_completion";
+export type RoutedAgent = "question" | "code_generation";
 
 // ─── Per-node execution status ────────────────────────────────────────────────
 
@@ -34,6 +34,9 @@ export interface GraphState {
 
   /** Current Python code from the editor (for code completion) */
   currentCode?: string;
+
+  /** User's preferred mode (overrides automatic routing) */
+  preferredMode?: "agent" | "ask";
 
   /** Which node is currently executing */
   currentNode: NodeId;
@@ -66,18 +69,19 @@ export interface GraphState {
 export function createInitialState(
   userMessage: string,
   history: ConversationMessage[] = [],
-  currentCode?: string
+  currentCode?: string,
+  preferredMode?: "agent" | "ask"
 ): GraphState {
   return {
     userMessage,
     history,
     currentCode,
+    preferredMode,
     currentNode: "history_agent",
     nodeStatuses: { history_agent: "pending" },
     agentOutputs: {
       question: "",
       code_generation: "",
-      code_completion: "",
       history_agent: ""
     }
   };
