@@ -33,12 +33,16 @@ interface BlocklyEditorProps {
   onEditToggle?: (isEditing: boolean) => void;
   showNotification: (message: string) => void;
   onRegisterImporter?: (importer: (jsonString: string) => boolean) => void;
+  onRegisterRestore?: (restore: (backupJson: string) => boolean) => void;
+  onRegisterExportCurrentJson?: (exporter: () => string | null) => void;
 }
 
 export function BlocklyEditor({
   onCodeChange,
   showNotification,
   onRegisterImporter,
+  onRegisterRestore,
+  onRegisterExportCurrentJson,
 }: BlocklyEditorProps) {
   const blocklyDivRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<Blockly.Workspace | null>(null);
@@ -136,7 +140,7 @@ export function BlocklyEditor({
           const json = JSON.parse(jsonString);
           const imported = importJson(json);
           if (imported) {
-            pythonGenerator.definitions_ = {};
+            (pythonGenerator as any).definitions_ = {};
             const code = pythonGenerator.workspaceToCode(workspace);
             onCodeChange(code);
             return true;
@@ -144,6 +148,40 @@ export function BlocklyEditor({
           return false;
         } catch {
           return false;
+        }
+      });
+    }
+
+    // Register the restore function for reverting to backup
+    if (onRegisterRestore) {
+      onRegisterRestore((backupJson: string) => {
+        try {
+          const json = JSON.parse(backupJson);
+          const imported = importJson(json);
+          if (imported) {
+            (pythonGenerator as any).definitions_ = {};
+            const code = pythonGenerator.workspaceToCode(workspace);
+            onCodeChange(code);
+            return true;
+          }
+          return false;
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    // Register export current JSON function
+    if (onRegisterExportCurrentJson) {
+      onRegisterExportCurrentJson(() => {
+        try {
+          const json = exportJson();
+          if (json && Object.keys(json).length > 0) {
+            return JSON.stringify(json);
+          }
+          return null;
+        } catch {
+          return null;
         }
       });
     }

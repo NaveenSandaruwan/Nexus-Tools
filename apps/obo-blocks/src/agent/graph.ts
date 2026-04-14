@@ -69,14 +69,28 @@ export async function runGraph(
 
     // Stop if an error was set by a node
     if (state.error && state.currentNode !== "end") {
-      state.reply = `An error occurred while running ${state.currentNode}`;
+      // ── FALLBACK: If error occurs AFTER code generation, use the generated code ──
+      if (state.pythonCode && state.agentOutputs.code_generation) {
+        // Code was already generated — use it and show code generation message
+        state.reply = state.agentOutputs.code_generation;
+        state.routedTo = "code_generation";
+      } else {
+        // Error occurred before code generation —show appropriate message
+        state.reply = `Request limit exceeded or connection interrupted. Please try again.`;
+      }
       state.currentNode = "end";
-
     }
   }
 
   if (steps >= MAX_STEPS) {
-    state.error = "Graph exceeded maximum step limit.";
+    // ── FALLBACK: If step limit exceeded but code was generated, use it ──
+    if (state.pythonCode && state.agentOutputs.code_generation) {
+      state.reply = state.agentOutputs.code_generation;
+      state.routedTo = "code_generation";
+    } else {
+      state.error = "Request limit exceeded. Please try again.";
+      state.reply = state.error;
+    }
   }
 
   return state;

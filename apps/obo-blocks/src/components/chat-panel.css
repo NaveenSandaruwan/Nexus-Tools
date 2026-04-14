@@ -1,0 +1,85 @@
+.chat-accept-reject-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px 0;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.accept-btn,
+.reject-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 100px;
+  justify-content: center;
+}
+
+.accept-btn {
+  background: linear-gradient(135deg, #45bd98 0%, #2ea878 100%);
+  color: white;
+  border: 1px solid rgba(69, 189, 152, 0.5);
+}
+
+.accept-btn:hover {
+  background: linear-gradient(135deg, #52cc9f 0%, #35b686 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(69, 189, 152, 0.3);
+}
+
+.accept-btn:active {
+  transform: translateY(0);
+}
+
+.reject-btn {
+  background: linear-gradient(135deg, #ef476f 0%, #d63450 100%);
+  color: white;
+  border: 1px solid rgba(239, 71, 111, 0.5);
+}
+
+.reject-btn:hover {
+  background: linear-gradient(135deg, #f45878 0%, #e01e42 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 71, 111, 0.3);
+}
+
+.reject-btn:active {
+  transform: translateY(0);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .accept-btn {
+    background: linear-gradient(135deg, #2d8f6d 0%, #206d54 100%);
+  }
+
+  .accept-btn:hover {
+    background: linear-gradient(135deg, #3ba07a 0%, #267a60 100%);
+  }
+
+  .reject-btn {
+    background: linear-gradient(135deg, #c63451 0%, #a01a35 100%);
+  }
+
+  .reject-btn:hover {
+    background: linear-gradient(135deg, #d43d58 0%, #b82238 100%);
+  }
+}

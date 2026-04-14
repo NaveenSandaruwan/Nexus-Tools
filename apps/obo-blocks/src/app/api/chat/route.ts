@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       body.mode
     );
 
-    if (finalState.error && !finalState.reply) {
+    if (finalState.error && !finalState.reply && !finalState.pythonCode) {
       return NextResponse.json<ChatResponse>(
         { reply: "", error: finalState.error },
         { status: 500 }
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
       reply: finalState.reply ?? "No response generated.",
       agent: finalState.routedTo,
       pythonCode: finalState.pythonCode,
+      // Mark as fallback if error occurred but code was generated anyway
+      isFallback: !!finalState.error && !!finalState.pythonCode,
     };
 
     return NextResponse.json<ChatResponse>(response);

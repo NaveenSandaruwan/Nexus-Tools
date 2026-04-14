@@ -10,6 +10,7 @@ import { Notification } from "@/components/notification";
 import { OutputPanel } from "@/components/output-panel";
 import { useBlocklyHandlers } from "@/hooks/use-blockly-handlers";
 import { useEditorHandlers } from "@/hooks/use-editor-handlers";
+import { useImportManager } from "@/hooks/use-import-manager";
 import { convertPythonToBlocks } from "@/python-to-blocks";
 
 const BlocklyEditor = dynamic(
@@ -28,13 +29,24 @@ export default function Home() {
 
   const { copyTextToClipboard, downloadPythonFile } = useEditorHandlers();
 
+  // Import manager for handling backup and restore
+  const {
+    backupCurrentWorkspace,
+    createPendingImport,
+    acceptImport,
+    rejectImport,
+    autoAcceptPending,
+  } = useImportManager();
+
+  // Refs to hold the workspace functions registered by BlocklyEditor
+  const importerRef = useRef<((jsonString: string) => boolean) | null>(null);
+  const restoreRef = useRef<((backupJson: string) => boolean) | null>(null);
+  const exportCurrentJsonRef = useRef<(() => string | null) | null>(null);
+
   const showNotification = useCallback((message: string) => {
     setNotification(message);
     setTimeout(() => setNotification(null), 1500);
   }, []);
-
-  // Ref to hold the workspace JSON importer registered by BlocklyEditor
-  const importerRef = useRef<((jsonString: string) => boolean) | null>(null);
 
   const handleRegisterImporter = useCallback(
     (importer: (jsonString: string) => boolean) => {
@@ -43,16 +55,40 @@ export default function Home() {
     []
   );
 
+  const handleRegisterRestore = useCallback(
+    (restore: (backupJson: string) => boolean) => {
+      restoreRef.current = restore;
+    },
+    []
+  );
+
+  const handleRegisterExportCurrentJson = useCallback(
+    (exporter: () => string | null) => {
+      exportCurrentJsonRef.current = exporter;
+    },
+    []
+  );
+
   const handleChatImportJson = useCallback(
     (jsonString: string): boolean => {
+      // Backup current workspace before importing
+      const currentJson = exportCurrentJsonRef.current?.();
+      if (currentJson) {
+        backupCurrentWorkspace(currentJson);
+      }
+
       if (importerRef.current) {
         const success = importerRef.current(jsonString);
-        if (success) showNotification("Workspace imported from chat");
+        if (success) {
+          showNotification("Workspace imported from chat");
+          // Create pending import for accept/reject
+          createPendingImport(jsonString);
+        }
         return success;
       }
       return false;
     },
-    [showNotification]
+    [backupCurrentWorkspace, createPendingImport, showNotification]
   );
 
   const handleConvertPython = useCallback(
@@ -67,6 +103,23 @@ export default function Home() {
     },
     []
   );
+
+  const handleAcceptImport = useCallback(() => {
+    acceptImport();
+    showNotification("✅ Changes accepted!");
+  }, [acceptImport, showNotification]);
+
+  const handleRejectImport = useCallback(() => {
+    const backupJson = rejectImport();
+    if (backupJson && restoreRef.current) {
+      restoreRef.current(backupJson);
+      showNotification("↶ Changes reverted");
+    }
+  }, [rejectImport, showNotification]);
+
+  const handleAutoAcceptPending = useCallback(() => {
+    autoAcceptPending();
+  }, [autoAcceptPending]);
 
   const {
     handleEditToggle,
@@ -106,7 +159,15 @@ export default function Home() {
   return (
     <div className="app-container">
       <Notification message={notification} />
-      <ChatPanel onImportJson={handleChatImportJson} onConvertPython={handleConvertPython} currentCode={code} />
+      <ChatPanel
+        onImportJson={handleChatImportJson}
+        onConvertPython={handleConvertPython}
+        currentCode={code}
+        onCreatePendingImport={handleChatImportJson}
+        onAutoAcceptPending={handleAutoAcceptPending}
+        onAcceptImport={handleAcceptImport}
+        onRejectImport={handleRejectImport}
+      />
       <Navbar />
 
       {isClient && (
@@ -117,6 +178,8 @@ export default function Home() {
               onEditToggle={handleEditToggleWrapper}
               showNotification={showNotification}
               onRegisterImporter={handleRegisterImporter}
+              onRegisterRestore={handleRegisterRestore}
+              onRegisterExportCurrentJson={handleRegisterExportCurrentJson}
             />
           </div>
 

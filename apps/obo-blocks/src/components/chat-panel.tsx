@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import type { ConversationMessage } from "@/agent/types";
+import "./chat-panel.css";
 
 interface ChatMessage {
   id: number;
@@ -10,15 +11,28 @@ interface ChatMessage {
   sender: "user" | "bot";
   timestamp: Date;
   isJson?: boolean;
+  showAcceptReject?: boolean;
 }
 
 interface ChatPanelProps {
   onImportJson?: (jsonString: string) => boolean;
   onConvertPython?: (pythonCode: string) => Promise<string | null>;
   currentCode?: string;
+  onCreatePendingImport?: (jsonString: string) => void;
+  onAutoAcceptPending?: () => void;
+  onAcceptImport?: () => void;
+  onRejectImport?: () => void;
 }
 
-export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPanelProps) {
+export function ChatPanel({
+  onImportJson,
+  onConvertPython,
+  currentCode,
+  onCreatePendingImport,
+  onAutoAcceptPending,
+  onAcceptImport,
+  onRejectImport,
+}: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -37,6 +51,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
   const [size, setSize] = useState({ width: 350, height: 460 });
   const [isResizing, setIsResizing] = useState(false);
   const [selectedMode, setSelectedMode] = useState<"agent" | "ask">("agent");
+  const [showAcceptReject, setShowAcceptReject] = useState(false);
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   const chatRef = useRef<HTMLDivElement>(null);
@@ -174,6 +189,11 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
     const trimmed = input.trim();
     if (!trimmed) return;
 
+    // Auto-accept any pending import before processing new message
+    if (onAutoAcceptPending) {
+      onAutoAcceptPending();
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now(),
       text: trimmed,
@@ -293,6 +313,9 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
                 ]);
               } else if (onImportJson) {
                 const success = onImportJson(jsonResult);
+                if (success && onCreatePendingImport) {
+                  onCreatePendingImport(jsonResult);
+                }
                 setMessages((prev) => [
                   ...prev,
                   {
@@ -302,8 +325,12 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
                       : "Code was generated but the workspace could not be updated. Please try again.",
                     sender: "bot",
                     timestamp: new Date(),
+                    showAcceptReject: success,
                   },
                 ]);
+                if (success) {
+                  setShowAcceptReject(true);
+                }
               }
             } catch { /* not an error object */ }
           } else {
@@ -344,7 +371,7 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
     } finally {
       setIsLoading(false);
     }
-  }, [input, conversationHistory, currentCode, onImportJson, onConvertPython]);
+  }, [input, conversationHistory, currentCode, onImportJson, onConvertPython, onCreatePendingImport, onAutoAcceptPending, onAcceptImport, onRejectImport]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -410,25 +437,50 @@ export function ChatPanel({ onImportJson, onConvertPython, currentCode }: ChatPa
       {/* Messages area */}
       <div className="chat-messages">
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`chat-message ${msg.sender === "user" ? "chat-message-user" : "chat-message-bot"}`}
-          >
-            <div className="chat-bubble">
-              {msg.sender === "bot" ? (
-                <div className="chat-markdown">
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
-                </div>
-              ) : (
-                <p style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
-              )}
-              <span className="chat-time">
-                {msg.timestamp.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
+          <div key={msg.id}>
+            <div
+              className={`chat-message ${msg.sender === "user" ? "chat-message-user" : "chat-message-bot"}`}
+            >
+              <div className="chat-bubble">
+                {msg.sender === "bot" ? (
+                  <div className="chat-markdown">
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
+                )}
+                <span className="chat-time">
+                  {msg.timestamp.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
             </div>
+            {msg.showAcceptReject && showAcceptReject && (
+              <div className="chat-accept-reject-buttons">
+                <button
+                  className="accept-btn"
+                  onClick={() => {
+                    onAcceptImport?.();
+                    setShowAcceptReject(false);
+                  }}
+                  title="Accept and keep the imported code"
+                >
+                  ✓ Accept
+                </button>
+                <button
+                  className="reject-btn"
+                  onClick={() => {
+                    onRejectImport?.();
+                    setShowAcceptReject(false);
+                  }}
+                  title="Reject and revert to previous code"
+                >
+                  ✕ Reject
+                </button>
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />
