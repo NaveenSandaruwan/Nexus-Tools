@@ -22,6 +22,7 @@ interface ChatPanelProps {
   onAutoAcceptPending?: () => void;
   onAcceptImport?: () => void;
   onRejectImport?: () => void;
+  onBackupBeforeQuestion?: () => void;
 }
 
 export function ChatPanel({
@@ -32,6 +33,7 @@ export function ChatPanel({
   onAutoAcceptPending,
   onAcceptImport,
   onRejectImport,
+  onBackupBeforeQuestion,
 }: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -188,6 +190,11 @@ export function ChatPanel({
   const handleSend = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+
+    // Backup the current workspace BEFORE asking the question
+    if (onBackupBeforeQuestion) {
+      onBackupBeforeQuestion();
+    }
 
     // Auto-accept any pending import before processing new message
     if (onAutoAcceptPending) {
@@ -371,7 +378,7 @@ export function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [input, conversationHistory, currentCode, onImportJson, onConvertPython, onCreatePendingImport, onAutoAcceptPending, onAcceptImport, onRejectImport]);
+  }, [input, conversationHistory, currentCode, onImportJson, onConvertPython, onCreatePendingImport, onAutoAcceptPending, onAcceptImport, onRejectImport, onBackupBeforeQuestion]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

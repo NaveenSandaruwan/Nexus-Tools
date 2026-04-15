@@ -71,11 +71,8 @@ export default function Home() {
 
   const handleChatImportJson = useCallback(
     (jsonString: string): boolean => {
-      // Backup current workspace before importing
-      const currentJson = exportCurrentJsonRef.current?.();
-      if (currentJson) {
-        backupCurrentWorkspace(currentJson);
-      }
+      // Backup is already done in handleBackupBeforeQuestion before the question is sent
+      // Now we just need to import the JSON and create a pending import
 
       if (importerRef.current) {
         const success = importerRef.current(jsonString);
@@ -88,7 +85,7 @@ export default function Home() {
       }
       return false;
     },
-    [backupCurrentWorkspace, createPendingImport, showNotification]
+    [createPendingImport, showNotification]
   );
 
   const handleConvertPython = useCallback(
@@ -111,15 +108,37 @@ export default function Home() {
 
   const handleRejectImport = useCallback(() => {
     const backupJson = rejectImport();
-    if (backupJson && restoreRef.current) {
-      restoreRef.current(backupJson);
-      showNotification("↶ Changes reverted");
+    if (backupJson) {
+      console.log("Rejecting import, restoring backup:", backupJson);
+      if (restoreRef.current) {
+        const restored = restoreRef.current(backupJson);
+        if (restored) {
+          showNotification("↶ Changes reverted");
+        } else {
+          showNotification("⚠️ Failed to restore previous state");
+          console.error("Restore function returned false");
+        }
+      } else {
+        showNotification("⚠️ Restore function not available");
+        console.error("restoreRef.current is not set");
+      }
+    } else {
+      showNotification("⚠️ No backup to restore");
+      console.error("rejectImport() returned null");
     }
   }, [rejectImport, showNotification]);
 
   const handleAutoAcceptPending = useCallback(() => {
     autoAcceptPending();
   }, [autoAcceptPending]);
+
+  const handleBackupBeforeQuestion = useCallback(() => {
+    const currentJson = exportCurrentJsonRef.current?.();
+    if (currentJson) {
+      backupCurrentWorkspace(currentJson);
+      console.log("Backed up workspace before question");
+    }
+  }, [backupCurrentWorkspace]);
 
   const {
     handleEditToggle,
@@ -167,6 +186,7 @@ export default function Home() {
         onAutoAcceptPending={handleAutoAcceptPending}
         onAcceptImport={handleAcceptImport}
         onRejectImport={handleRejectImport}
+        onBackupBeforeQuestion={handleBackupBeforeQuestion}
       />
       <Navbar />
 

@@ -138,6 +138,10 @@ export function BlocklyEditor({
       onRegisterImporter((jsonString: string) => {
         try {
           const json = JSON.parse(jsonString);
+          
+          // Clear the workspace first before importing
+          workspace.clear();
+          
           const imported = importJson(json);
           if (imported) {
             (pythonGenerator as any).definitions_ = {};
@@ -156,16 +160,26 @@ export function BlocklyEditor({
     if (onRegisterRestore) {
       onRegisterRestore((backupJson: string) => {
         try {
+          console.log("Restoring from backup:", backupJson);
           const json = JSON.parse(backupJson);
+          
+          // Clear the workspace first before importing
+          workspace.clear();
+          
           const imported = importJson(json);
           if (imported) {
+            console.log("Backup restored successfully");
             (pythonGenerator as any).definitions_ = {};
             const code = pythonGenerator.workspaceToCode(workspace);
+            console.log("Generated code after restore:", code);
             onCodeChange(code);
             return true;
+          } else {
+            console.error("importJson returned false");
+            return false;
           }
-          return false;
-        } catch {
+        } catch (err) {
+          console.error("Error restoring backup:", err);
           return false;
         }
       });
@@ -187,7 +201,7 @@ export function BlocklyEditor({
     }
 
     return workspace;
-  }, [onCodeChange, onRegisterImporter]);
+  }, [onCodeChange, onRegisterImporter, onRegisterRestore, onRegisterExportCurrentJson]);
 
   // Initialize Blockly and define blocks
   useEffect(() => {

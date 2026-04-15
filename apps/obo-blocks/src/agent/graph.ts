@@ -56,7 +56,8 @@ export async function runGraph(
 
   while (state.currentNode !== "end" && steps < MAX_STEPS) {
     const nodeFn = NODE_MAP[state.currentNode];
-
+    // add a sleep here
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // 1000ms delay between nodes
     if (!nodeFn) {
       // Unknown node — this is a bug in the graph definition
       state.error = `Unknown node: "${state.currentNode}"`;
